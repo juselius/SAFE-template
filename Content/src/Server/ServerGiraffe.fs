@@ -33,17 +33,7 @@ let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" 
 let publicPath = tryGetEnv "public_path" |> Option.defaultValue "../Client/public" |> Path.GetFullPath
 let storageAccount = tryGetEnv "STORAGE_CONNECTIONSTRING" |> Option.defaultValue "UseDevelopmentStorage=true" |> CloudStorageAccount.Parse
 //#else
-\#if DEBUG
-let publicPath =
-    "DOTNET_RUNNING_IN_CONTAINER"
-    |> tryGetEnv
-    |> function
-    | Some x when x = "true" -> "./public"
-    | _ -> "../Client/deploy"
-    |> IO.Path.GetFullPath
-\#else
-let publicPath = IO.Path.GetFullPath "./public"
-\#endif
+let publicPath = IO.Path.GetFullPath "../Client/public"
 //#endif
 let port =
 //#if (deploy == "heroku")
@@ -102,6 +92,9 @@ let webApp =
 #endif
 
 let configureLogging (builder : ILoggingBuilder) =
+    builder
+        .SetMinimumLevel(LogLevel.Warning)
+        .AddSerilog() |> ignore
     let logConf =
         LoggerConfiguration()
             .MinimumLevel.Warning()
@@ -109,9 +102,6 @@ let configureLogging (builder : ILoggingBuilder) =
             .WriteTo.Console()
             .CreateLogger()
     Log.Logger <- logConf
-    builder
-        .SetMinimumLevel( LogLevel.Warning )
-        .AddSerilog() |> ignore
 
 let configureApp (app : IApplicationBuilder) =
     app.UseDefaultFiles()
@@ -119,7 +109,8 @@ let configureApp (app : IApplicationBuilder) =
 #if (bridge)
        .UseWebSockets()
 #endif
-       .UseEndpoints(fun ep -> ep.MapMetrics() |> ignore)
+       .UseRouting()
+       .UseHttpMetrics()
        .UseGiraffe webApp
 
 let configureServices (services : IServiceCollection) =
