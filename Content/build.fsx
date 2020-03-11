@@ -159,7 +159,7 @@ Target.create "InstallClient" (fun _ ->
 )
 
 Target.create "Build" (fun _ ->
-    // writeVersionFile "src/Server/version.json"
+    writeVersionFile "src/Server/version.json"
     runDotNet "build" serverPath
     Shell.regexReplaceInFileWithEncoding
         "let app = \".+\""
@@ -445,10 +445,12 @@ open Fake.Core.TargetOperators
 
 "Clean"
     ==> "InstallClient"
+    ==> "Build"
     ==> "Release"
 
 "Clean"
     ==> "InstallClient"
+    ==> "Build"
     ==> "Debug"
 
 "Clean"
