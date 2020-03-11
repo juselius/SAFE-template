@@ -6,10 +6,14 @@ open Microsoft.AspNetCore
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 
 open FSharp.Control.Tasks.V2
 open Giraffe
+open Prometheus
+open Serilog
 open Shared
+open Settings
 
 #if (remoting)
 open Fable.Remoting.Server
@@ -29,7 +33,17 @@ let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" 
 let publicPath = tryGetEnv "public_path" |> Option.defaultValue "../Client/public" |> Path.GetFullPath
 let storageAccount = tryGetEnv "STORAGE_CONNECTIONSTRING" |> Option.defaultValue "UseDevelopmentStorage=true" |> CloudStorageAccount.Parse
 //#else
-let publicPath = Path.GetFullPath "../Client/public"
+\#if DEBUG
+let publicPath =
+    "DOTNET_RUNNING_IN_CONTAINER"
+    |> tryGetEnv
+    |> function
+    | Some x when x = "true" -> "./public"
+    | _ -> "../Client/deploy"
+    |> IO.Path.GetFullPath
+\#else
+let publicPath = IO.Path.GetFullPath "./public"
+\#endif
 //#endif
 let port =
 //#if (deploy == "heroku")
@@ -87,12 +101,25 @@ let webApp =
             }
 #endif
 
+let configureLogging (builder : ILoggingBuilder) =
+    let logConf =
+        LoggerConfiguration()
+            .MinimumLevel.Warning()
+            .WriteTo.Seq(settings.seqUrl, apiKey=settings.seqApiKey )
+            .WriteTo.Console()
+            .CreateLogger()
+    Log.Logger <- logConf
+    builder
+        .SetMinimumLevel( LogLevel.Warning )
+        .AddSerilog() |> ignore
+
 let configureApp (app : IApplicationBuilder) =
     app.UseDefaultFiles()
        .UseStaticFiles()
 #if (bridge)
        .UseWebSockets()
 #endif
+       .UseEndpoints(fun ep -> ep.MapMetrics() |> ignore)
        .UseGiraffe webApp
 
 let configureServices (services : IServiceCollection) =
@@ -103,6 +130,7 @@ let configureServices (services : IServiceCollection) =
     #if (deploy == "azure")
     tryGetEnv "APPINSIGHTS_INSTRUMENTATIONKEY" |> Option.iter (services.AddApplicationInsightsTelemetry >> ignore)
     #endif
+    services.AddRetireRuntimeHostedService(fun c -> c.CheckInterval <- 60000) |> ignore
 
 WebHost
     .CreateDefaultBuilder()
@@ -110,6 +138,8 @@ WebHost
     .UseContentRoot(publicPath)
     .Configure(Action<IApplicationBuilder> configureApp)
     .ConfigureServices(configureServices)
+    .ConfigureLogging(configureLogging)
+    .UseSentry("")
     #if (deploy == "iis")
     .UseIISIntegration()
     #endif

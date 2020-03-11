@@ -25,3 +25,17 @@ group Server
 //#elseif (bridge && server == "suave")
     Elmish.Bridge.Suave
 //#endif
+
+    Sentry.AspNetCore
+    prometheus-net.AspNetCore
+
+    Serilog
+    Serilog.AspNetCore
+    Serilog.Sinks.Seq
+    Serilog.Sinks.Console
+
+    SecurityCodeScan
+    RetireNet.Runtimes.BackgroundServices
+    RetireNet.Runtimes.Middleware
+
+

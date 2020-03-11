@@ -1,6 +1,6 @@
 group Server
     source https://api.nuget.org/v3/index.json
-    framework: netcoreapp3.0
+    framework: netcoreapp3.1
     storage: none
 
     nuget FSharp.Core
@@ -31,6 +31,18 @@ group Server
     nuget WindowsAzure.Storage
 //#endif
 
+    nuget Sentry.AspNetCore prerelease
+    nuget prometheus-net.AspNetCore
+
+    nuget Serilog
+    nuget Serilog.AspNetCore
+    nuget Serilog.Sinks.Seq
+    nuget Serilog.Sinks.Console
+ 
+    nuget SecurityCodeScan
+    nuget RetireNet.Runtimes.BackgroundServices
+    nuget RetireNet.Runtimes.Middleware
+
 group Client
     source https://api.nuget.org/v3/index.json
     framework: netstandard2.0
@@ -46,7 +58,7 @@ group Client
     nuget FSharp.Control.AsyncRx ~> 1.0.0
 //#endif
 //#if (!remoting)
-    nuget Thoth.Fetch ~> 1
+    nuget Thoth.Fetch 
 //#endif
     nuget Fable.React ~> 5
 //#if (remoting)

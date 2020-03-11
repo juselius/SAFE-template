@@ -13,6 +13,7 @@
         "language": "F#",
         "type": "project"
     },
+    "preferNameDirectory": true,
     "identity": "SAFE.Template",
     "shortName": "SAFE",
     "sourceName": "SAFE.Template",
@@ -28,7 +29,7 @@
         "server": {
             "type": "parameter",
             "dataType": "choice",
-            "defaultValue": "saturn",
+            "defaultValue": "giraffe",
             "choices": [
                 {
                     "choice": "suave",
@@ -143,7 +144,7 @@
         "deploy": {
             "type": "parameter",
             "dataType": "choice",
-            "defaultValue": "none",
+            "defaultValue": "docker",
             "choices": [
                 {
                     "choice": "none",

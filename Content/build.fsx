@@ -56,7 +56,7 @@ let gcloudTool () = platformTool "gcloud" "gcloud.cmd"
 
 let runTool cmd args workingDir =
     let arguments = args |> String.split ' ' |> Arguments.OfArgs
-    Command.RawCommand (cmd, arguments)
+    RawCommand (cmd, arguments)
     |> CreateProcess.fromCommand
     |> CreateProcess.withWorkingDirectory workingDir
     |> CreateProcess.ensureExitCode
@@ -70,7 +70,7 @@ let runDotNet cmd workingDir =
 
 let openBrowser url =
     //https://github.com/dotnet/corefx/issues/10361
-    Command.ShellCommand url
+    ShellCommand url
     |> CreateProcess.fromCommand
     |> CreateProcess.ensureExitCodeWithMessage "opening browser failed"
     |> Proc.run
@@ -116,6 +116,28 @@ let createAndExposeKubernetesDeploy appName dockerTag port =
     runTool "kubectl" exposeArgs __SOURCE_DIRECTORY__
 //#endif
 
+let commitId () =
+    ShellCommand "git rev-parse --short HEAD"
+    |> CreateProcess.fromCommand
+    |> CreateProcess.redirectOutput
+    |> Proc.run
+    |> fun result ->
+        if result.ExitCode <> 0
+            then "unknown"
+        else
+            result.Result.Output
+
+let writeVersionFile file =
+    let commit = commitId ()
+    let json =
+        sprintf """
+            {
+                commit: %s,
+                version: %s
+            }
+        """ commit release.NugetVersion
+    File.writeString false file json
+
 Target.create "Clean" (fun _ ->
     [ deployDir
       clientDeployPath ]
@@ -137,6 +159,7 @@ Target.create "InstallClient" (fun _ ->
 )
 
 Target.create "Build" (fun _ ->
+    // writeVersionFile "src/Server/version.json"
     runDotNet "build" serverPath
     Shell.regexReplaceInFileWithEncoding
         "let app = \".+\""
@@ -180,21 +203,20 @@ Target.create "Run" (fun _ ->
     |> ignore
 )
 
+let publish release =
+     let serverDir = Path.combine deployDir "Server"
+     let clientDir = Path.combine deployDir "Client"
+     let publicDir = Path.combine clientDir "public"
+     let publishArgs = sprintf "publish -c %s -o \"%s\"" release serverDir
+     runDotNet publishArgs serverPath
+     Shell.copyDir publicDir clientDeployPath FileFilter.allFiles
+
 //#if (deploy == "docker" || deploy == "gcp-kubernetes" || deploy == "gcp-appengine")
 let buildDocker tag =
     let args = sprintf "build -t %s ." tag
     runTool "docker" args __SOURCE_DIRECTORY__
 
-Target.create "Bundle" (fun _ ->
-    let serverDir = Path.combine deployDir "Server"
-    let clientDir = Path.combine deployDir "Client"
-    let publicDir = Path.combine clientDir "public"
-
-    let publishArgs = sprintf "publish -c Release -o \"%s\"" serverDir
-    runDotNet publishArgs serverPath
-
-    Shell.copyDir publicDir clientDeployPath FileFilter.allFiles
-)
+Target.create "Bundle" (fun _ -> publish "Release")
 
 let dockerUser = "safe-template"
 let dockerImageName = "safe-template"
@@ -389,6 +411,11 @@ Target.create "Deploy" (fun _ ->
     runTool herokuTool "open" __SOURCE_DIRECTORY__
 )
 //#endif
+
+Target.create "Release" (fun _ -> publish "Release")
+
+Target.create "Debug" (fun _ -> publish "Debug")
+
 open Fake.Core.TargetOperators
 
 "Clean"
@@ -415,6 +442,14 @@ open Fake.Core.TargetOperators
 "Bundle"
     ==> "Deploy"
 //#endif
+
+"Clean"
+    ==> "InstallClient"
+    ==> "Release"
+
+"Clean"
+    ==> "InstallClient"
+    ==> "Debug"
 
 "Clean"
     ==> "InstallClient"

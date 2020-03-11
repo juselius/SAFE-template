@@ -96,7 +96,11 @@ let initialCounter = Server.api.initialCounter
 #elseif (deploy == "iis" && server != "suave")
 let initialCounter () = Fetch.fetchAs<Counter> (ServerPath.normalize "/api/init")
 #elseif (!bridge)
-let initialCounter () = Fetch.fetchAs<Counter> "/api/init"
+let initialCounter () =
+    promise {
+        let! (c : Counter) = Fetch.fetchAs "/api/init"
+        return c
+    }
 #endif
 
 #if (bridge)
@@ -911,6 +915,8 @@ let view (model : Model) (dispatch : Msg -> unit) =
 open Elmish.Debug
 open Elmish.HMR
 #endif
+
+Sentry.init ()
 
 //+:cnd:noEmit
 #if (streams)
